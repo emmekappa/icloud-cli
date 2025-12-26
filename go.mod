@@ -1,6 +1,6 @@
 module github.com/jingkaihe/icloud-cli
 
-go 1.24
+go 1.25
 
 require (
 	github.com/emersion/go-ical v0.0.0-20240127095438-fc1c9d8fb2b6
@@ -17,4 +17,5 @@ require (
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	golang.org/x/text v0.14.0 // indirect
 )

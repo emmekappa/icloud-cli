@@ -40,6 +40,7 @@ type Attachment struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
 	Size        int64  `json:"size"`
+	Path        string `json:"path,omitempty"`
 }
 
 type Mailbox struct {
