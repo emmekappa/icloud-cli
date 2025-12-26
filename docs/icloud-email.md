@@ -14,7 +14,7 @@ We will implement email functionality using **IMAP** for reading/managing emails
 
 ## Feasibility Assessment
 
-### ✅ Highly Feasible
+### Highly Feasible
 
 | Factor | Assessment |
 |--------|------------|
@@ -60,7 +60,7 @@ icloud email list [-a ACCOUNT] [-m MAILBOX] [-n LIMIT] [-o FORMAT]
   # FORMAT: tsv (default) or json
 
 # List all mailboxes/folders
-icloud email mailboxes [-a ACCOUNT]
+icloud email mailbox list [-a ACCOUNT]
 
 # Read a specific email
 icloud email get <message-id> [-a ACCOUNT] [-m MAILBOX] [-o FORMAT]
@@ -174,7 +174,7 @@ icloud email flag <message-id> -m MAILBOX --set|--unset [-a ACCOUNT]
 - [ ] Add `go-imap/v2`, `go-smtp`, `go-sasl`, `go-message` dependencies
 - [ ] Create `internal/email/client.go` with IMAP/SMTP connection handling
 - [ ] Add email server configuration to existing account config
-- [ ] Implement `email mailboxes` command
+- [ ] Implement `email mailbox list` command
 
 ### Phase 2: Reading Emails (Week 1-2)
 - [ ] Implement `email list` command
