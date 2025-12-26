@@ -6,7 +6,7 @@ A Go-based CLI tool for interacting with iCloud services. Supports calendar mana
 
 ## Tech Stack
 
-- **Language**: Go 1.24+
+- **Language**: Go 1.25+
 - **CLI Framework**: [cobra](https://github.com/spf13/cobra) for command structure
 - **CalDAV Client**: [go-webdav](https://github.com/emersion/go-webdav) for iCloud CalDAV API
 - **IMAP Client**: [go-imap/v2](https://github.com/emersion/go-imap) for email reading
