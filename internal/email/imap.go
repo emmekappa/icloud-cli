@@ -121,7 +121,7 @@ func (c *Client) GetEmail(mailbox string, uid uint32) (*Email, error) {
 		Flags:    true,
 		Envelope: true,
 		BodySection: []*imap.FetchItemBodySection{
-			{Specifier: imap.PartSpecifierText},
+			{Specifier: imap.PartSpecifierNone, Peek: true},
 		},
 	}
 
@@ -134,7 +134,7 @@ func (c *Client) GetEmail(mailbox string, uid uint32) (*Email, error) {
 		return nil, fmt.Errorf("email with UID %d not found in %s", uid, mailbox)
 	}
 
-	email := c.parseMessageWithBody(msg, mailbox)
+	email := c.parseMessageWithBody(msg, mailbox, uid)
 
 	if err := fetchCmd.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close fetch command: %w", err)
@@ -343,8 +343,9 @@ func (c *Client) parseMessage(msg *imapclient.FetchMessageData, mailbox string) 
 	return email
 }
 
-func (c *Client) parseMessageWithBody(msg *imapclient.FetchMessageData, mailbox string) Email {
+func (c *Client) parseMessageWithBody(msg *imapclient.FetchMessageData, mailbox string, uid uint32) Email {
 	email := Email{Mailbox: mailbox}
+	var rawBody []byte
 
 	for {
 		item := msg.Next()
@@ -378,8 +379,18 @@ func (c *Client) parseMessageWithBody(msg *imapclient.FetchMessageData, mailbox 
 			email.CC = convertAddresses(data.Envelope.Cc)
 			email.BCC = convertAddresses(data.Envelope.Bcc)
 		case imapclient.FetchItemDataBodySection:
-			body, _ := io.ReadAll(data.Literal)
-			email.Body = string(body)
+			rawBody, _ = io.ReadAll(data.Literal)
+		}
+	}
+
+	if len(rawBody) > 0 {
+		textBody, htmlBody, attachments, err := ParseMIMEMessage(rawBody, mailbox, uid)
+		if err == nil {
+			email.Body = textBody
+			email.HTMLBody = htmlBody
+			email.Attachments = attachments
+		} else {
+			email.Body = string(rawBody)
 		}
 	}
 
@@ -478,16 +489,44 @@ func (c *Client) GetEmailByMessageID(mailbox, messageID string) (*Email, error) 
 	var seqSet imap.SeqSet
 	seqSet.AddNum(seqNums[0])
 
+	uidFetchOptions := &imap.FetchOptions{UID: true}
+	uidFetchCmd := imapClient.Fetch(seqSet, uidFetchOptions)
+	uidMsg := uidFetchCmd.Next()
+	if uidMsg == nil {
+		uidFetchCmd.Close()
+		return nil, fmt.Errorf("email with Message-ID %s not found", messageID)
+	}
+
+	var uid uint32
+	for {
+		item := uidMsg.Next()
+		if item == nil {
+			break
+		}
+		if uidData, ok := item.(imapclient.FetchItemDataUID); ok {
+			uid = uint32(uidData.UID)
+			break
+		}
+	}
+	uidFetchCmd.Close()
+
+	if uid == 0 {
+		return nil, fmt.Errorf("could not determine UID for email with Message-ID %s", messageID)
+	}
+
+	var uidSet imap.UIDSet
+	uidSet.AddNum(imap.UID(uid))
+
 	fetchOptions := &imap.FetchOptions{
 		UID:      true,
 		Flags:    true,
 		Envelope: true,
 		BodySection: []*imap.FetchItemBodySection{
-			{Specifier: imap.PartSpecifierText},
+			{Specifier: imap.PartSpecifierNone, Peek: true},
 		},
 	}
 
-	fetchCmd := imapClient.Fetch(seqSet, fetchOptions)
+	fetchCmd := imapClient.Fetch(uidSet, fetchOptions)
 	msg := fetchCmd.Next()
 	if msg == nil {
 		if err := fetchCmd.Close(); err != nil {
@@ -496,7 +535,7 @@ func (c *Client) GetEmailByMessageID(mailbox, messageID string) (*Email, error) 
 		return nil, fmt.Errorf("email with Message-ID %s not found", messageID)
 	}
 
-	email := c.parseMessageWithBody(msg, mailbox)
+	email := c.parseMessageWithBody(msg, mailbox, uid)
 
 	if err := fetchCmd.Close(); err != nil {
 		return nil, fmt.Errorf("failed to close fetch command: %w", err)

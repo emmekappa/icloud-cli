@@ -180,6 +180,16 @@ func outputEmailDetail(e *email.Email) error {
 	}
 	fmt.Printf("Subject: %s\n", e.Subject)
 	fmt.Printf("Flags: seen=%t flagged=%t answered=%t\n", e.Seen, e.Flagged, e.Answered)
+
+	if len(e.Attachments) > 0 {
+		fmt.Println()
+		fmt.Printf("--- Attachments (%d) ---\n", len(e.Attachments))
+		for i, att := range e.Attachments {
+			fmt.Printf("%d. %s (%s, %d bytes)\n", i+1, att.Filename, att.ContentType, att.Size)
+			fmt.Printf("   Saved to: %s\n", att.Path)
+		}
+	}
+
 	fmt.Println()
 	fmt.Println("--- Body ---")
 	fmt.Println(e.Body)

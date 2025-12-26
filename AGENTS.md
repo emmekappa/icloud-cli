@@ -111,6 +111,7 @@ icloud email list [-a ACCOUNT] [-m MAILBOX] [-n LIMIT] [-o FORMAT]
   # FORMAT: tsv (default) or json
 
 icloud email get <uid> -m MAILBOX [-a ACCOUNT] [-o FORMAT]
+  # Attachments are automatically saved to ~/.cache/icloud/attachments/<mailbox>/<uid>/
 
 icloud email search <query> [-a ACCOUNT] [-m MAILBOX] [-n LIMIT] [-o FORMAT]
   # Search criteria: FROM:, TO:, SUBJECT:, BODY:, SINCE:YYYY-MM-DD, BEFORE:YYYY-MM-DD, UNSEEN, FLAGGED
