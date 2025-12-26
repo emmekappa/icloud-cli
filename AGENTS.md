@@ -21,7 +21,11 @@ A Go-based CLI tool for interacting with iCloud services via CalDAV. Currently s
 │   ├── calendar.go              # Calendar management commands
 │   └── event.go                 # Event management commands
 ├── internal/
-│   ├── caldav/client.go         # CalDAV client wrapper for iCloud
+│   ├── caldav/                  # CalDAV client wrapper for iCloud
+│   │   ├── client.go            # Client struct, NewClient(), FindCalendarHomeSet()
+│   │   ├── calendar.go          # Calendar struct and CRUD operations
+│   │   ├── event.go             # Event struct and CRUD operations
+│   │   └── helpers.go           # XML/iCal escaping, time parsing, ICS building
 │   └── config/config.go         # Config management (~/.config/icloud-cli/)
 ```
 
@@ -45,7 +49,8 @@ go mod tidy
 
 ```bash
 # Account management
-icloud account add [--email EMAIL --password PASS]  # Uses APPLE_EMAIL/APPLE_APP_SPECIFIC_PASSWORD env vars
+icloud account add [-e EMAIL] [-p PASSWORD] [-n NAME] [--alias ALIAS]
+  # Can use env vars: APPLE_EMAIL, APPLE_APP_SPECIFIC_PASSWORD
 icloud account list
 icloud account set-default <account>
 icloud account remove <account>
@@ -53,17 +58,20 @@ icloud account remove <account>
 # Calendar management
 icloud calendar list [-a ACCOUNT]
 icloud calendar create <name> [-a ACCOUNT]
-icloud calendar delete <calendar-id> [-f]
-icloud calendar update <calendar-id> --name <new-name>
+icloud calendar delete <calendar-id> [-a ACCOUNT] [-f]
+icloud calendar update <calendar-id> -n <new-name> [-a ACCOUNT]
 
 # Event management
-icloud event list [-a ACCOUNT] [-s START_DATE] [-e END_DATE] [-c CALENDAR_ID] [-o FORMAT]
-  # Dates: YYYY-MM-DD or relative (1d, 1w, -2d)
+icloud event list [-a ACCOUNT] [-s START] [-e END] [-c CALENDAR_ID] [-o FORMAT]
+  # Dates: YYYY-MM-DD or relative (1d, 1w, -2d, 1m)
   # Output: tsv (default) or json
-icloud event create -t TITLE -s START -c CALENDAR_ID [-e END] [-l LOCATION] [-d DESCRIPTION]
-  # Start/End: YYYY-MM-DD HH:MM (e.g., 2024-01-15 14:30)
-icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-l LOCATION] [-d DESCRIPTION]
-icloud event delete <event-uid> -c CALENDAR_ID [-f]
+  # Defaults to current week if no dates specified
+icloud event get <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-o FORMAT]
+icloud event create -t TITLE -s START -c CALENDAR_ID [-e END] [-l LOCATION] [-d DESCRIPTION] [-a ACCOUNT]
+  # Start/End: YYYY-MM-DD HH:MM or YYYY-MM-DDTHH:MM
+  # End defaults to 1 hour after start if not specified
+icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-l LOCATION] [-d DESCRIPTION] [-a ACCOUNT]
+icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f]
 ```
 
 ## Configuration
