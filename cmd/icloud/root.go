@@ -17,4 +17,5 @@ func Execute() error {
 func init() {
 	rootCmd.AddCommand(accountCmd)
 	rootCmd.AddCommand(calendarCmd)
+	rootCmd.AddCommand(eventCmd)
 }

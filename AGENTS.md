@@ -18,7 +18,8 @@ A Go-based CLI tool for interacting with iCloud services via CalDAV. Currently s
 ├── cmd/icloud/                  # CLI commands (cobra)
 │   ├── root.go                  # Root command setup
 │   ├── account.go               # Account management commands
-│   └── calendar.go              # Calendar management commands
+│   ├── calendar.go              # Calendar management commands
+│   └── event.go                 # Event management commands
 ├── internal/
 │   ├── caldav/client.go         # CalDAV client wrapper for iCloud
 │   └── config/config.go         # Config management (~/.config/icloud-cli/)
@@ -54,6 +55,11 @@ icloud calendar list [-a ACCOUNT]
 icloud calendar create <name> [-a ACCOUNT]
 icloud calendar delete <calendar-id> [-f]
 icloud calendar update <calendar-id> --name <new-name>
+
+# Event management
+icloud event list [-a ACCOUNT] [-s START_DATE] [-e END_DATE] [-c CALENDAR_ID] [-o FORMAT]
+  # Dates: YYYY-MM-DD or relative (1d, 1w, -2d)
+  # Output: tsv (default) or json
 ```
 
 ## Configuration
@@ -88,5 +94,6 @@ icloud calendar update <calendar-id> --name <new-name>
 
 ## Planned Features (from REQ.md)
 
-- [ ] Event management (list, create, update, delete events)
+- [x] Event management: list events
+- [ ] Event management: create, update, delete events
 - [ ] Email support
