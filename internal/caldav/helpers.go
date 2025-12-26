@@ -78,6 +78,9 @@ func buildICS(event Event) string {
 	if event.RRULE != "" {
 		sb.WriteString(fmt.Sprintf("RRULE:%s\r\n", event.RRULE))
 	}
+	for _, exdate := range event.EXDATEs {
+		sb.WriteString(fmt.Sprintf("EXDATE:%s\r\n", exdate.UTC().Format("20060102T150405Z")))
+	}
 	sb.WriteString("END:VEVENT\r\n")
 	sb.WriteString("END:VCALENDAR\r\n")
 

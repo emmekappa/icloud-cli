@@ -417,8 +417,15 @@ Only the fields you specify will be updated.`,
 var eventDeleteCmd = &cobra.Command{
 	Use:   "delete <event-uid>",
 	Short: "Delete a calendar event",
-	Long:  `Delete an event from the specified calendar.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Delete an event from the specified calendar.
+
+For recurring events, you can choose to:
+  - Delete entire series: use --series flag
+  - Delete single occurrence: use --occurrence with the date/time of the occurrence
+
+If neither --series nor --occurrence is specified for a recurring event,
+you will be prompted to choose.`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := signalContext()
 
@@ -430,6 +437,8 @@ var eventDeleteCmd = &cobra.Command{
 		eventUID := args[0]
 		calendarID, _ := cmd.Flags().GetString("calendar-id")
 		force, _ := cmd.Flags().GetBool("force")
+		series, _ := cmd.Flags().GetBool("series")
+		occurrenceStr, _ := cmd.Flags().GetString("occurrence")
 
 		if calendarID == "" {
 			return fmt.Errorf("--calendar-id is required")
@@ -440,12 +449,48 @@ var eventDeleteCmd = &cobra.Command{
 			return fmt.Errorf("failed to find calendar: %w", err)
 		}
 
-		if !force {
-			existing, err := client.GetEvent(ctx, cal.Path, eventUID)
-			if err != nil {
-				return fmt.Errorf("failed to get event: %w", err)
+		existing, err := client.GetEvent(ctx, cal.Path, eventUID)
+		if err != nil {
+			return fmt.Errorf("failed to get event: %w", err)
+		}
+
+		isRecurring := existing.RRULE != ""
+
+		if occurrenceStr != "" {
+			if !isRecurring {
+				return fmt.Errorf("--occurrence can only be used with recurring events")
 			}
-			fmt.Printf("Are you sure you want to delete '%s'? Use --force to confirm.\n", existing.Summary)
+			occurrenceTime, err := parseDateTime(occurrenceStr)
+			if err != nil {
+				return fmt.Errorf("invalid occurrence time: %w", err)
+			}
+
+			if !force {
+				fmt.Printf("Are you sure you want to delete the occurrence of '%s' on %s? Use --force to confirm.\n",
+					existing.Summary, occurrenceTime.Format("2006-01-02 15:04"))
+				return nil
+			}
+
+			if err := client.DeleteEventOccurrence(ctx, cal.Path, eventUID, occurrenceTime); err != nil {
+				return fmt.Errorf("failed to delete occurrence: %w", err)
+			}
+
+			fmt.Printf("Occurrence on %s deleted.\n", occurrenceTime.Format("2006-01-02 15:04"))
+			return nil
+		}
+
+		if isRecurring && !series {
+			fmt.Printf("'%s' is a recurring event.\n", existing.Summary)
+			fmt.Println("Use --series to delete the entire series, or --occurrence <datetime> to delete a single occurrence.")
+			return nil
+		}
+
+		if !force {
+			if isRecurring {
+				fmt.Printf("Are you sure you want to delete the entire series '%s'? Use --force to confirm.\n", existing.Summary)
+			} else {
+				fmt.Printf("Are you sure you want to delete '%s'? Use --force to confirm.\n", existing.Summary)
+			}
 			return nil
 		}
 
@@ -453,7 +498,11 @@ var eventDeleteCmd = &cobra.Command{
 			return fmt.Errorf("failed to delete event: %w", err)
 		}
 
-		fmt.Println("Event deleted.")
+		if isRecurring {
+			fmt.Println("Recurring event series deleted.")
+		} else {
+			fmt.Println("Event deleted.")
+		}
 		return nil
 	},
 }
@@ -504,6 +553,8 @@ func init() {
 
 	eventDeleteCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
 	eventDeleteCmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
+	eventDeleteCmd.Flags().BoolP("series", "S", false, "Delete entire recurring series")
+	eventDeleteCmd.Flags().StringP("occurrence", "o", "", "Delete single occurrence (format: YYYY-MM-DD HH:MM)")
 
 	eventCmd.AddCommand(eventListCmd)
 	eventCmd.AddCommand(eventGetCmd)

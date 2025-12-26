@@ -91,7 +91,10 @@ icloud event create -t TITLE -s START -c CALENDAR_ID [-e END] [-l LOCATION] [-d 
   #   FREQ=DAILY;COUNT=10                 (daily for 10 occurrences)
   #   FREQ=WEEKLY;UNTIL=20251231T235959Z  (weekly until end of 2025)
 icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-l LOCATION] [-d DESCRIPTION] [-r RRULE] [-a ACCOUNT]
-icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f]
+icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f] [-S] [-o OCCURRENCE]
+  # For recurring events:
+  #   --series (-S): Delete entire recurring series
+  #   --occurrence (-o): Delete single occurrence (format: YYYY-MM-DD HH:MM)
 
 # Email management
 icloud email mailbox list [-a ACCOUNT]

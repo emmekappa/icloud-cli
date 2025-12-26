@@ -24,6 +24,7 @@ type Event struct {
 	Start        time.Time
 	End          time.Time
 	RRULE        string
+	EXDATEs      []time.Time
 	CalendarPath string
 	CalendarName string
 }
@@ -44,6 +45,7 @@ func (c *Client) ListEvents(ctx context.Context, calendarPath string, start, end
 						"DTSTART",
 						"DTEND",
 						"RRULE",
+						"EXDATE",
 						"DURATION",
 					},
 				},
@@ -87,6 +89,7 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 	var uid, summary, description, location, rruleStr string
 	var eventStart, eventEnd time.Time
 	var duration time.Duration
+	var exdates []time.Time
 
 	if props := comp.Props.Get(ical.PropUID); props != nil {
 		uid = props.Value
@@ -102,6 +105,9 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 	}
 	if props := comp.Props.Get(ical.PropRecurrenceRule); props != nil {
 		rruleStr = props.Value
+	}
+	for _, prop := range comp.Props.Values(ical.PropExceptionDates) {
+		exdates = append(exdates, parseICalTime(prop))
 	}
 	if props := comp.Props.Get(ical.PropDateTimeStart); props != nil {
 		eventStart = parseICalTime(*props)
@@ -129,6 +135,7 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 				Start:       eventStart,
 				End:         eventEnd,
 				RRULE:       rruleStr,
+				EXDATEs:     exdates,
 			}}
 		}
 		return nil
@@ -145,12 +152,16 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 			Start:       eventStart,
 			End:         eventEnd,
 			RRULE:       rruleStr,
+			EXDATEs:     exdates,
 		}}
 	}
 
 	occurrences := rule.Between(rangeStart, rangeEnd, true)
 	var events []Event
 	for _, occStart := range occurrences {
+		if isExcluded(occStart, exdates) {
+			continue
+		}
 		events = append(events, Event{
 			UID:         uid,
 			Summary:     summary,
@@ -159,10 +170,21 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 			Start:       occStart,
 			End:         occStart.Add(duration),
 			RRULE:       rruleStr,
+			EXDATEs:     exdates,
 		})
 	}
 
 	return events
+}
+
+func isExcluded(t time.Time, exdates []time.Time) bool {
+	for _, exdate := range exdates {
+		if t.Year() == exdate.Year() && t.Month() == exdate.Month() && t.Day() == exdate.Day() &&
+			t.Hour() == exdate.Hour() && t.Minute() == exdate.Minute() {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) ListEventsAllCalendars(ctx context.Context, start, end time.Time) ([]Event, error) {
@@ -269,6 +291,25 @@ func (c *Client) DeleteEvent(ctx context.Context, calendarPath, eventUID string)
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to delete event: %s - %s", resp.Status, string(respBody))
+	}
+
+	return nil
+}
+
+func (c *Client) DeleteEventOccurrence(ctx context.Context, calendarPath, eventUID string, occurrenceTime time.Time) error {
+	event, err := c.GetEvent(ctx, calendarPath, eventUID)
+	if err != nil {
+		return fmt.Errorf("failed to get event: %w", err)
+	}
+
+	if event.RRULE == "" {
+		return fmt.Errorf("event is not recurring; use regular delete instead")
+	}
+
+	event.EXDATEs = append(event.EXDATEs, occurrenceTime)
+
+	if err := c.UpdateEvent(ctx, calendarPath, *event); err != nil {
+		return fmt.Errorf("failed to exclude occurrence: %w", err)
 	}
 
 	return nil
