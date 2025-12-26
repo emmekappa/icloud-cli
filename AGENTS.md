@@ -111,6 +111,7 @@ icloud email flag <uid> -m MAILBOX --set|--unset [-a ACCOUNT]
 # Draft management
 icloud email draft create -t TO -s SUBJECT [-c CC] [-B BODY] [-a ACCOUNT]
 icloud email draft list [-a ACCOUNT] [-n LIMIT] [-o FORMAT]
+icloud email draft get <uid> [-a ACCOUNT] [-o FORMAT]
 icloud email draft update <uid> [-t TO] [-s SUBJECT] [-c CC] [-B BODY] [-a ACCOUNT]
 icloud email draft delete <uid> [-a ACCOUNT] [-f]
 icloud email draft send <uid> [-a ACCOUNT]

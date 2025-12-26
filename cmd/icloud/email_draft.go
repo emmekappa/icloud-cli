@@ -35,6 +35,18 @@ Examples:
 	RunE: runDraftList,
 }
 
+var emailDraftGetCmd = &cobra.Command{
+	Use:   "get <uid>",
+	Short: "Get a specific draft by UID",
+	Long: `Read a specific draft by its UID.
+
+Examples:
+  icloud email draft get 12345
+  icloud email draft get 12345 -o json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDraftGet,
+}
+
 var emailDraftUpdateCmd = &cobra.Command{
 	Use:   "update <uid>",
 	Short: "Update a draft",
@@ -83,6 +95,7 @@ func init() {
 	emailCmd.AddCommand(emailDraftCmd)
 	emailDraftCmd.AddCommand(emailDraftCreateCmd)
 	emailDraftCmd.AddCommand(emailDraftListCmd)
+	emailDraftCmd.AddCommand(emailDraftGetCmd)
 	emailDraftCmd.AddCommand(emailDraftUpdateCmd)
 	emailDraftCmd.AddCommand(emailDraftDeleteCmd)
 	emailDraftCmd.AddCommand(emailDraftSendCmd)
@@ -146,6 +159,29 @@ func runDraftList(cmd *cobra.Command, args []string) error {
 	}
 
 	return outputEmailList(drafts)
+}
+
+func runDraftGet(cmd *cobra.Command, args []string) error {
+	uid, err := parseUID(args[0])
+	if err != nil {
+		return err
+	}
+
+	client, err := getEmailClient(emailAccountFlag)
+	if err != nil {
+		return err
+	}
+
+	draft, err := client.GetDraft(uid)
+	if err != nil {
+		return err
+	}
+
+	if emailOutputFlag == "json" {
+		return outputEmailAsJSON(draft)
+	}
+
+	return outputEmailDetail(draft)
 }
 
 func runDraftUpdate(cmd *cobra.Command, args []string) error {
