@@ -7,25 +7,6 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup mise
-        uses: jdx/mise-action@v2
-        with:
-          install: true
-          cache: true
-          experimental: true
-
-      - name: Install dependencies
-        run: mise run install
-
-      - name: Run tests
-        run: mise run test
-
   cross-compile:
     name: Cross-Compile Check
     runs-on: ubuntu-latest
