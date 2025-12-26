@@ -268,7 +268,16 @@ Date/time formats supported:
   - YYYY-MM-DD HH:MM (e.g., 2024-01-15 14:30)
   - YYYY-MM-DDTHH:MM (e.g., 2024-01-15T14:30)
 
-If end time is not specified, the event will be 1 hour long.`,
+If end time is not specified, the event will be 1 hour long.
+
+Recurrence rules (RRULE) follow the iCalendar RFC 5545 format:
+  - FREQ=DAILY                          (every day)
+  - FREQ=WEEKLY;BYDAY=MO,WE,FR          (every Mon, Wed, Fri)
+  - FREQ=WEEKLY;INTERVAL=2              (every 2 weeks)
+  - FREQ=MONTHLY;BYMONTHDAY=15          (15th of every month)
+  - FREQ=YEARLY;BYMONTH=1;BYMONTHDAY=1  (every Jan 1st)
+  - FREQ=DAILY;COUNT=10                 (daily for 10 occurrences)
+  - FREQ=WEEKLY;UNTIL=20251231T235959Z  (weekly until end of 2025)`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := signalContext()
 
@@ -283,6 +292,7 @@ If end time is not specified, the event will be 1 hour long.`,
 		calendarID, _ := cmd.Flags().GetString("calendar-id")
 		location, _ := cmd.Flags().GetString("location")
 		description, _ := cmd.Flags().GetString("description")
+		rrule, _ := cmd.Flags().GetString("rrule")
 
 		if title == "" {
 			return fmt.Errorf("--title is required")
@@ -320,6 +330,7 @@ If end time is not specified, the event will be 1 hour long.`,
 			End:         end,
 			Location:    location,
 			Description: description,
+			RRULE:       rrule,
 		}
 
 		created, err := client.CreateEvent(ctx, cal.Path, event)
@@ -388,6 +399,10 @@ Only the fields you specify will be updated.`,
 		if cmd.Flags().Changed("description") {
 			description, _ := cmd.Flags().GetString("description")
 			existing.Description = description
+		}
+		if cmd.Flags().Changed("rrule") {
+			rrule, _ := cmd.Flags().GetString("rrule")
+			existing.RRULE = rrule
 		}
 
 		if err := client.UpdateEvent(ctx, cal.Path, *existing); err != nil {
@@ -477,6 +492,7 @@ func init() {
 	eventCreateCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
 	eventCreateCmd.Flags().StringP("location", "l", "", "Event location")
 	eventCreateCmd.Flags().StringP("description", "d", "", "Event description")
+	eventCreateCmd.Flags().StringP("rrule", "r", "", "Recurrence rule (e.g., FREQ=WEEKLY;BYDAY=MO,WE,FR)")
 
 	eventUpdateCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
 	eventUpdateCmd.Flags().StringP("title", "t", "", "New event title")
@@ -484,6 +500,7 @@ func init() {
 	eventUpdateCmd.Flags().StringP("end", "e", "", "New end time (format: YYYY-MM-DD HH:MM)")
 	eventUpdateCmd.Flags().StringP("location", "l", "", "New event location")
 	eventUpdateCmd.Flags().StringP("description", "d", "", "New event description")
+	eventUpdateCmd.Flags().StringP("rrule", "r", "", "New recurrence rule (e.g., FREQ=WEEKLY;BYDAY=MO,WE,FR)")
 
 	eventDeleteCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
 	eventDeleteCmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")

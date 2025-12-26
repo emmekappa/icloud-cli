@@ -75,6 +75,9 @@ func buildICS(event Event) string {
 	if event.Location != "" {
 		sb.WriteString(fmt.Sprintf("LOCATION:%s\r\n", escapeICalText(event.Location)))
 	}
+	if event.RRULE != "" {
+		sb.WriteString(fmt.Sprintf("RRULE:%s\r\n", event.RRULE))
+	}
 	sb.WriteString("END:VEVENT\r\n")
 	sb.WriteString("END:VCALENDAR\r\n")
 

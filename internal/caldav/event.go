@@ -23,6 +23,7 @@ type Event struct {
 	Location     string
 	Start        time.Time
 	End          time.Time
+	RRULE        string
 	CalendarPath string
 	CalendarName string
 }
@@ -83,7 +84,7 @@ func (c *Client) ListEvents(ctx context.Context, calendarPath string, start, end
 }
 
 func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
-	var uid, summary, description, location string
+	var uid, summary, description, location, rruleStr string
 	var eventStart, eventEnd time.Time
 	var duration time.Duration
 
@@ -98,6 +99,9 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 	}
 	if props := comp.Props.Get(ical.PropLocation); props != nil {
 		location = props.Value
+	}
+	if props := comp.Props.Get(ical.PropRecurrenceRule); props != nil {
+		rruleStr = props.Value
 	}
 	if props := comp.Props.Get(ical.PropDateTimeStart); props != nil {
 		eventStart = parseICalTime(*props)
@@ -124,6 +128,7 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 				Location:    location,
 				Start:       eventStart,
 				End:         eventEnd,
+				RRULE:       rruleStr,
 			}}
 		}
 		return nil
@@ -139,6 +144,7 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 			Location:    location,
 			Start:       eventStart,
 			End:         eventEnd,
+			RRULE:       rruleStr,
 		}}
 	}
 
@@ -152,6 +158,7 @@ func expandEvent(comp *ical.Component, rangeStart, rangeEnd time.Time) []Event {
 			Location:    location,
 			Start:       occStart,
 			End:         occStart.Add(duration),
+			RRULE:       rruleStr,
 		})
 	}
 

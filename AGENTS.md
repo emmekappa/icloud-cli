@@ -80,10 +80,17 @@ icloud event list [-a ACCOUNT] [-s START] [-e END] [-c CALENDAR_ID] [-o FORMAT]
   # Output: tsv (default) or json
   # Defaults to current week if no dates specified
 icloud event get <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-o FORMAT]
-icloud event create -t TITLE -s START -c CALENDAR_ID [-e END] [-l LOCATION] [-d DESCRIPTION] [-a ACCOUNT]
+icloud event create -t TITLE -s START -c CALENDAR_ID [-e END] [-l LOCATION] [-d DESCRIPTION] [-r RRULE] [-a ACCOUNT]
   # Start/End: YYYY-MM-DD HH:MM or YYYY-MM-DDTHH:MM
   # End defaults to 1 hour after start if not specified
-icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-l LOCATION] [-d DESCRIPTION] [-a ACCOUNT]
+  # RRULE examples:
+  #   FREQ=DAILY                          (every day)
+  #   FREQ=WEEKLY;BYDAY=MO,WE,FR          (every Mon, Wed, Fri)
+  #   FREQ=WEEKLY;INTERVAL=2              (every 2 weeks)
+  #   FREQ=MONTHLY;BYMONTHDAY=15          (15th of every month)
+  #   FREQ=DAILY;COUNT=10                 (daily for 10 occurrences)
+  #   FREQ=WEEKLY;UNTIL=20251231T235959Z  (weekly until end of 2025)
+icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-l LOCATION] [-d DESCRIPTION] [-r RRULE] [-a ACCOUNT]
 icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f]
 
 # Email management
