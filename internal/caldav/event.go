@@ -25,6 +25,7 @@ type Event struct {
 	End          time.Time
 	RRULE        string
 	EXDATEs      []time.Time
+	RecurrenceID *time.Time
 	CalendarPath string
 	CalendarName string
 }
@@ -310,6 +311,67 @@ func (c *Client) DeleteEventOccurrence(ctx context.Context, calendarPath, eventU
 
 	if err := c.UpdateEvent(ctx, calendarPath, *event); err != nil {
 		return fmt.Errorf("failed to exclude occurrence: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) UpdateEventOccurrence(ctx context.Context, calendarPath, eventUID string, occurrenceTime time.Time, updates Event) error {
+	master, err := c.GetEvent(ctx, calendarPath, eventUID)
+	if err != nil {
+		return fmt.Errorf("failed to get event: %w", err)
+	}
+
+	if master.RRULE == "" {
+		return fmt.Errorf("event is not recurring; use regular update instead")
+	}
+
+	exception := Event{
+		UID:          master.UID,
+		Summary:      master.Summary,
+		Description:  master.Description,
+		Location:     master.Location,
+		Start:        occurrenceTime,
+		End:          occurrenceTime.Add(master.End.Sub(master.Start)),
+		RecurrenceID: &occurrenceTime,
+	}
+
+	if updates.Summary != "" {
+		exception.Summary = updates.Summary
+	}
+	if updates.Description != "" {
+		exception.Description = updates.Description
+	}
+	if updates.Location != "" {
+		exception.Location = updates.Location
+	}
+	if !updates.Start.IsZero() {
+		exception.Start = updates.Start
+	}
+	if !updates.End.IsZero() {
+		exception.End = updates.End
+	}
+
+	eventPath := path.Join(calendarPath, eventUID+".ics")
+	eventURL := iCloudCalDAVURL + eventPath
+
+	icsData := buildICSWithException(*master, exception)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, eventURL, bytes.NewBufferString(icsData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "text/calendar; charset=utf-8")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to update occurrence: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update occurrence: %s - %s", resp.Status, string(respBody))
 	}
 
 	return nil
