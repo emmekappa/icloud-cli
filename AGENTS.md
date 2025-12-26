@@ -60,6 +60,10 @@ icloud calendar update <calendar-id> --name <new-name>
 icloud event list [-a ACCOUNT] [-s START_DATE] [-e END_DATE] [-c CALENDAR_ID] [-o FORMAT]
   # Dates: YYYY-MM-DD or relative (1d, 1w, -2d)
   # Output: tsv (default) or json
+icloud event create -t TITLE -s START -c CALENDAR_ID [-e END] [-l LOCATION] [-d DESCRIPTION]
+  # Start/End: YYYY-MM-DD HH:MM (e.g., 2024-01-15 14:30)
+icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-l LOCATION] [-d DESCRIPTION]
+icloud event delete <event-uid> -c CALENDAR_ID [-f]
 ```
 
 ## Configuration
@@ -95,5 +99,5 @@ icloud event list [-a ACCOUNT] [-s START_DATE] [-e END_DATE] [-c CALENDAR_ID] [-
 ## Planned Features (from REQ.md)
 
 - [x] Event management: list events
-- [ ] Event management: create, update, delete events
+- [x] Event management: create, update, delete events
 - [ ] Email support

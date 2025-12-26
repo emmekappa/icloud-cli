@@ -100,8 +100,16 @@ func (c *Client) GetCalendar(ctx context.Context, calendarID string) (*Calendar,
 		return nil, err
 	}
 
+	// Try exact path match first
 	for _, cal := range calendars {
 		if cal.Path == calendarID || strings.HasSuffix(cal.Path, "/"+calendarID+"/") {
+			return &cal, nil
+		}
+	}
+
+	// Try case-insensitive name match
+	for _, cal := range calendars {
+		if strings.EqualFold(cal.Name, calendarID) {
 			return &cal, nil
 		}
 	}
@@ -409,6 +417,151 @@ func (cal *Calendar) SupportsEvents() bool {
 		}
 	}
 	return false
+}
+
+func (c *Client) CreateEvent(ctx context.Context, calendarPath string, event Event) (*Event, error) {
+	if event.UID == "" {
+		event.UID = uuid.New().String()
+	}
+
+	eventPath := path.Join(calendarPath, event.UID+".ics")
+	eventURL := iCloudCalDAVURL + eventPath
+
+	icsData := buildICS(event)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, eventURL, bytes.NewBufferString(icsData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "text/calendar; charset=utf-8")
+	req.Header.Set("If-None-Match", "*")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create event: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("failed to create event: %s - %s", resp.Status, string(respBody))
+	}
+
+	return &event, nil
+}
+
+func (c *Client) UpdateEvent(ctx context.Context, calendarPath string, event Event) error {
+	if event.UID == "" {
+		return fmt.Errorf("event UID is required for update")
+	}
+
+	eventPath := path.Join(calendarPath, event.UID+".ics")
+	eventURL := iCloudCalDAVURL + eventPath
+
+	icsData := buildICS(event)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, eventURL, bytes.NewBufferString(icsData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "text/calendar; charset=utf-8")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to update event: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update event: %s - %s", resp.Status, string(respBody))
+	}
+
+	return nil
+}
+
+func (c *Client) DeleteEvent(ctx context.Context, calendarPath, eventUID string) error {
+	eventPath := path.Join(calendarPath, eventUID+".ics")
+	eventURL := iCloudCalDAVURL + eventPath
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, eventURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to delete event: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to delete event: %s - %s", resp.Status, string(respBody))
+	}
+
+	return nil
+}
+
+func (c *Client) GetEvent(ctx context.Context, calendarPath, eventUID string) (*Event, error) {
+	eventPath := path.Join(calendarPath, eventUID+".ics")
+
+	obj, err := c.caldavClient.GetCalendarObject(ctx, eventPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get event: %w", err)
+	}
+
+	if obj.Data == nil {
+		return nil, fmt.Errorf("event not found")
+	}
+
+	for _, comp := range obj.Data.Children {
+		if comp.Name != "VEVENT" {
+			continue
+		}
+		events := expandEvent(comp, time.Time{}, time.Now().AddDate(100, 0, 0))
+		if len(events) > 0 {
+			events[0].CalendarPath = calendarPath
+			return &events[0], nil
+		}
+	}
+
+	return nil, fmt.Errorf("event not found")
+}
+
+func buildICS(event Event) string {
+	now := time.Now().UTC().Format("20060102T150405Z")
+	dtstart := event.Start.UTC().Format("20060102T150405Z")
+	dtend := event.End.UTC().Format("20060102T150405Z")
+
+	var sb strings.Builder
+	sb.WriteString("BEGIN:VCALENDAR\r\n")
+	sb.WriteString("VERSION:2.0\r\n")
+	sb.WriteString("PRODID:-//icloud-cli//EN\r\n")
+	sb.WriteString("BEGIN:VEVENT\r\n")
+	sb.WriteString(fmt.Sprintf("UID:%s\r\n", event.UID))
+	sb.WriteString(fmt.Sprintf("DTSTAMP:%s\r\n", now))
+	sb.WriteString(fmt.Sprintf("DTSTART:%s\r\n", dtstart))
+	sb.WriteString(fmt.Sprintf("DTEND:%s\r\n", dtend))
+	sb.WriteString(fmt.Sprintf("SUMMARY:%s\r\n", escapeICalText(event.Summary)))
+	if event.Description != "" {
+		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s\r\n", escapeICalText(event.Description)))
+	}
+	if event.Location != "" {
+		sb.WriteString(fmt.Sprintf("LOCATION:%s\r\n", escapeICalText(event.Location)))
+	}
+	sb.WriteString("END:VEVENT\r\n")
+	sb.WriteString("END:VCALENDAR\r\n")
+
+	return sb.String()
+}
+
+func escapeICalText(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, ";", "\\;")
+	s = strings.ReplaceAll(s, ",", "\\,")
+	s = strings.ReplaceAll(s, "\n", "\\n")
+	return s
 }
 
 func parseICalTime(prop ical.Prop) time.Time {

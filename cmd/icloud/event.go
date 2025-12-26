@@ -145,6 +145,7 @@ func startOfWeek(t time.Time) time.Time {
 }
 
 type eventOutput struct {
+	UID         string `json:"uid"`
 	Title       string `json:"title"`
 	Start       string `json:"start"`
 	End         string `json:"end"`
@@ -157,6 +158,7 @@ func outputJSON(events []caldav.Event) error {
 	output := make([]eventOutput, len(events))
 	for i, e := range events {
 		output[i] = eventOutput{
+			UID:         e.UID,
 			Title:       e.Summary,
 			Start:       e.Start.Format(time.RFC3339),
 			End:         e.End.Format(time.RFC3339),
@@ -181,18 +183,12 @@ func outputTSV(events []caldav.Event) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Calendar\tTitle\tStart\tEnd\tLocation\tDescription")
+	fmt.Fprintln(w, "UID\tCalendar\tTitle\tStart\tEnd\tLocation")
 	for _, e := range events {
 		location := e.Location
 		if location == "" {
 			location = "-"
 		}
-		description := e.Description
-		if description == "" {
-			description = "-"
-		}
-		description = strings.ReplaceAll(description, "\n", " ")
-		description = strings.ReplaceAll(description, "\t", " ")
 
 		calendar := e.CalendarName
 		if calendar == "" {
@@ -200,15 +196,268 @@ func outputTSV(events []caldav.Event) error {
 		}
 
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			e.UID,
 			calendar,
 			e.Summary,
 			e.Start.Format("2006-01-02 15:04"),
 			e.End.Format("2006-01-02 15:04"),
 			location,
-			description,
 		)
 	}
 	return w.Flush()
+}
+
+var eventGetCmd = &cobra.Command{
+	Use:   "get <event-uid>",
+	Short: "Get details of a calendar event",
+	Long:  `Get detailed information about a specific event by its UID.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := signalContext()
+
+		client, _, err := getCalDAVClient(cmd)
+		if err != nil {
+			return err
+		}
+
+		eventUID := args[0]
+		calendarID, _ := cmd.Flags().GetString("calendar-id")
+		output, _ := cmd.Flags().GetString("output")
+
+		if calendarID == "" {
+			return fmt.Errorf("--calendar-id is required")
+		}
+
+		cal, err := client.GetCalendar(ctx, calendarID)
+		if err != nil {
+			return fmt.Errorf("failed to find calendar: %w", err)
+		}
+
+		event, err := client.GetEvent(ctx, cal.Path, eventUID)
+		if err != nil {
+			return fmt.Errorf("failed to get event: %w", err)
+		}
+
+		event.CalendarName = cal.Name
+
+		if output == "json" {
+			return outputJSON([]caldav.Event{*event})
+		}
+
+		fmt.Printf("UID:         %s\n", event.UID)
+		fmt.Printf("Title:       %s\n", event.Summary)
+		fmt.Printf("Calendar:    %s\n", cal.Name)
+		fmt.Printf("Start:       %s\n", event.Start.Format("2006-01-02 15:04"))
+		fmt.Printf("End:         %s\n", event.End.Format("2006-01-02 15:04"))
+		if event.Location != "" {
+			fmt.Printf("Location:    %s\n", event.Location)
+		}
+		if event.Description != "" {
+			fmt.Printf("Description: %s\n", event.Description)
+		}
+		return nil
+	},
+}
+
+var eventCreateCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create a new calendar event",
+	Long: `Create a new event in the specified calendar.
+
+Date/time formats supported:
+  - YYYY-MM-DD HH:MM (e.g., 2024-01-15 14:30)
+  - YYYY-MM-DDTHH:MM (e.g., 2024-01-15T14:30)
+
+If end time is not specified, the event will be 1 hour long.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := signalContext()
+
+		client, _, err := getCalDAVClient(cmd)
+		if err != nil {
+			return err
+		}
+
+		title, _ := cmd.Flags().GetString("title")
+		startStr, _ := cmd.Flags().GetString("start")
+		endStr, _ := cmd.Flags().GetString("end")
+		calendarID, _ := cmd.Flags().GetString("calendar-id")
+		location, _ := cmd.Flags().GetString("location")
+		description, _ := cmd.Flags().GetString("description")
+
+		if title == "" {
+			return fmt.Errorf("--title is required")
+		}
+		if startStr == "" {
+			return fmt.Errorf("--start is required")
+		}
+		if calendarID == "" {
+			return fmt.Errorf("--calendar-id is required")
+		}
+
+		start, err := parseDateTime(startStr)
+		if err != nil {
+			return fmt.Errorf("invalid start time: %w", err)
+		}
+
+		var end time.Time
+		if endStr == "" {
+			end = start.Add(1 * time.Hour)
+		} else {
+			end, err = parseDateTime(endStr)
+			if err != nil {
+				return fmt.Errorf("invalid end time: %w", err)
+			}
+		}
+
+		cal, err := client.GetCalendar(ctx, calendarID)
+		if err != nil {
+			return fmt.Errorf("failed to find calendar: %w", err)
+		}
+
+		event := caldav.Event{
+			Summary:     title,
+			Start:       start,
+			End:         end,
+			Location:    location,
+			Description: description,
+		}
+
+		created, err := client.CreateEvent(ctx, cal.Path, event)
+		if err != nil {
+			return fmt.Errorf("failed to create event: %w", err)
+		}
+
+		fmt.Printf("Event created: %s (UID: %s)\n", created.Summary, created.UID)
+		return nil
+	},
+}
+
+var eventUpdateCmd = &cobra.Command{
+	Use:   "update <event-uid>",
+	Short: "Update an existing calendar event",
+	Long: `Update an existing event. The event UID and calendar ID are required.
+
+Only the fields you specify will be updated.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := signalContext()
+
+		client, _, err := getCalDAVClient(cmd)
+		if err != nil {
+			return err
+		}
+
+		eventUID := args[0]
+		calendarID, _ := cmd.Flags().GetString("calendar-id")
+
+		if calendarID == "" {
+			return fmt.Errorf("--calendar-id is required")
+		}
+
+		cal, err := client.GetCalendar(ctx, calendarID)
+		if err != nil {
+			return fmt.Errorf("failed to find calendar: %w", err)
+		}
+
+		existing, err := client.GetEvent(ctx, cal.Path, eventUID)
+		if err != nil {
+			return fmt.Errorf("failed to get event: %w", err)
+		}
+
+		if title, _ := cmd.Flags().GetString("title"); title != "" {
+			existing.Summary = title
+		}
+		if startStr, _ := cmd.Flags().GetString("start"); startStr != "" {
+			start, err := parseDateTime(startStr)
+			if err != nil {
+				return fmt.Errorf("invalid start time: %w", err)
+			}
+			existing.Start = start
+		}
+		if endStr, _ := cmd.Flags().GetString("end"); endStr != "" {
+			end, err := parseDateTime(endStr)
+			if err != nil {
+				return fmt.Errorf("invalid end time: %w", err)
+			}
+			existing.End = end
+		}
+		if cmd.Flags().Changed("location") {
+			location, _ := cmd.Flags().GetString("location")
+			existing.Location = location
+		}
+		if cmd.Flags().Changed("description") {
+			description, _ := cmd.Flags().GetString("description")
+			existing.Description = description
+		}
+
+		if err := client.UpdateEvent(ctx, cal.Path, *existing); err != nil {
+			return fmt.Errorf("failed to update event: %w", err)
+		}
+
+		fmt.Printf("Event updated: %s\n", existing.Summary)
+		return nil
+	},
+}
+
+var eventDeleteCmd = &cobra.Command{
+	Use:   "delete <event-uid>",
+	Short: "Delete a calendar event",
+	Long:  `Delete an event from the specified calendar.`,
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := signalContext()
+
+		client, _, err := getCalDAVClient(cmd)
+		if err != nil {
+			return err
+		}
+
+		eventUID := args[0]
+		calendarID, _ := cmd.Flags().GetString("calendar-id")
+		force, _ := cmd.Flags().GetBool("force")
+
+		if calendarID == "" {
+			return fmt.Errorf("--calendar-id is required")
+		}
+
+		cal, err := client.GetCalendar(ctx, calendarID)
+		if err != nil {
+			return fmt.Errorf("failed to find calendar: %w", err)
+		}
+
+		if !force {
+			existing, err := client.GetEvent(ctx, cal.Path, eventUID)
+			if err != nil {
+				return fmt.Errorf("failed to get event: %w", err)
+			}
+			fmt.Printf("Are you sure you want to delete '%s'? Use --force to confirm.\n", existing.Summary)
+			return nil
+		}
+
+		if err := client.DeleteEvent(ctx, cal.Path, eventUID); err != nil {
+			return fmt.Errorf("failed to delete event: %w", err)
+		}
+
+		fmt.Println("Event deleted.")
+		return nil
+	},
+}
+
+func parseDateTime(s string) (time.Time, error) {
+	s = strings.ReplaceAll(s, "T", " ")
+
+	formats := []string{
+		"2006-01-02 15:04",
+		"2006-01-02 15:04:05",
+	}
+
+	for _, format := range formats {
+		if t, err := time.ParseInLocation(format, s, time.Local); err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("invalid datetime format: %s (use YYYY-MM-DD HH:MM)", s)
 }
 
 func init() {
@@ -216,8 +465,32 @@ func init() {
 
 	eventListCmd.Flags().StringP("start-date", "s", "", "Start date (YYYY-MM-DD or relative like 1d, 1w)")
 	eventListCmd.Flags().StringP("end-date", "e", "", "End date (YYYY-MM-DD or relative like 1d, 1w)")
-	eventListCmd.Flags().StringP("calendar-id", "c", "", "Filter by calendar ID")
+	eventListCmd.Flags().StringP("calendar-id", "c", "", "Filter by calendar (ID or name)")
 	eventListCmd.Flags().StringP("output", "o", "tsv", "Output format (tsv or json)")
 
+	eventGetCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
+	eventGetCmd.Flags().StringP("output", "o", "", "Output format (json)")
+
+	eventCreateCmd.Flags().StringP("title", "t", "", "Event title (required)")
+	eventCreateCmd.Flags().StringP("start", "s", "", "Start time (required, format: YYYY-MM-DD HH:MM)")
+	eventCreateCmd.Flags().StringP("end", "e", "", "End time (format: YYYY-MM-DD HH:MM)")
+	eventCreateCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
+	eventCreateCmd.Flags().StringP("location", "l", "", "Event location")
+	eventCreateCmd.Flags().StringP("description", "d", "", "Event description")
+
+	eventUpdateCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
+	eventUpdateCmd.Flags().StringP("title", "t", "", "New event title")
+	eventUpdateCmd.Flags().StringP("start", "s", "", "New start time (format: YYYY-MM-DD HH:MM)")
+	eventUpdateCmd.Flags().StringP("end", "e", "", "New end time (format: YYYY-MM-DD HH:MM)")
+	eventUpdateCmd.Flags().StringP("location", "l", "", "New event location")
+	eventUpdateCmd.Flags().StringP("description", "d", "", "New event description")
+
+	eventDeleteCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
+	eventDeleteCmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
+
 	eventCmd.AddCommand(eventListCmd)
+	eventCmd.AddCommand(eventGetCmd)
+	eventCmd.AddCommand(eventCreateCmd)
+	eventCmd.AddCommand(eventUpdateCmd)
+	eventCmd.AddCommand(eventDeleteCmd)
 }
