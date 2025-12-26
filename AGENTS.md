@@ -51,8 +51,11 @@ go build -o icloud .
 # Run
 ./icloud <command>
 
-# Test (no tests yet)
+# Unit tests
 go test ./...
+
+# Acceptance tests (requires logged-in iCloud account)
+./test/acceptance/calendar_event_test.sh
 
 # Tidy dependencies
 go mod tidy
