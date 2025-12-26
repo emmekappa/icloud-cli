@@ -2,13 +2,15 @@
 
 ## Project Overview
 
-A Go-based CLI tool for interacting with iCloud services via CalDAV. Currently supports calendar management (list, create, update, delete) with plans to extend to email functionality.
+A Go-based CLI tool for interacting with iCloud services. Supports calendar management via CalDAV and email management via IMAP/SMTP.
 
 ## Tech Stack
 
 - **Language**: Go 1.24+
 - **CLI Framework**: [cobra](https://github.com/spf13/cobra) for command structure
 - **CalDAV Client**: [go-webdav](https://github.com/emersion/go-webdav) for iCloud CalDAV API
+- **IMAP Client**: [go-imap/v2](https://github.com/emersion/go-imap) for email reading
+- **SMTP Client**: [go-smtp](https://github.com/emersion/go-smtp) for email sending
 - **UUID Generation**: [google/uuid](https://github.com/google/uuid)
 
 ## Project Structure
@@ -19,13 +21,24 @@ A Go-based CLI tool for interacting with iCloud services via CalDAV. Currently s
 │   ├── root.go                  # Root command setup
 │   ├── account.go               # Account management commands
 │   ├── calendar.go              # Calendar management commands
-│   └── event.go                 # Event management commands
+│   ├── event.go                 # Event management commands
+│   ├── email.go                 # Email command group and mailbox list
+│   ├── email_list.go            # Email list, get, search commands
+│   ├── email_send.go            # Email send and reply commands
+│   ├── email_draft.go           # Draft management commands
+│   └── email_manage.go          # Email move, delete, mark, flag commands
 ├── internal/
 │   ├── caldav/                  # CalDAV client wrapper for iCloud
 │   │   ├── client.go            # Client struct, NewClient(), FindCalendarHomeSet()
 │   │   ├── calendar.go          # Calendar struct and CRUD operations
 │   │   ├── event.go             # Event struct and CRUD operations
 │   │   └── helpers.go           # XML/iCal escaping, time parsing, ICS building
+│   ├── email/                   # Email client wrapper for iCloud
+│   │   ├── client.go            # IMAP/SMTP connection handling
+│   │   ├── message.go           # Email, Address, Attachment structs
+│   │   ├── imap.go              # IMAP operations (list, fetch, search, move, delete, mark, flag)
+│   │   ├── smtp.go              # SMTP operations (send)
+│   │   └── draft.go             # Draft-specific operations
 │   └── config/config.go         # Config management (~/.config/icloud-cli/)
 ```
 
@@ -72,6 +85,35 @@ icloud event create -t TITLE -s START -c CALENDAR_ID [-e END] [-l LOCATION] [-d 
   # End defaults to 1 hour after start if not specified
 icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-l LOCATION] [-d DESCRIPTION] [-a ACCOUNT]
 icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f]
+
+# Email management
+icloud email mailbox list [-a ACCOUNT]
+
+icloud email list [-a ACCOUNT] [-m MAILBOX] [-n LIMIT] [-o FORMAT]
+  # MAILBOX: INBOX (default), Sent Messages, Drafts, Trash, Junk, Archive
+  # LIMIT: number of emails (default: 20)
+  # FORMAT: tsv (default) or json
+
+icloud email get <uid> -m MAILBOX [-a ACCOUNT] [-o FORMAT]
+
+icloud email search <query> [-a ACCOUNT] [-m MAILBOX] [-n LIMIT] [-o FORMAT]
+  # Search criteria: FROM:, TO:, SUBJECT:, BODY:, SINCE:YYYY-MM-DD, BEFORE:YYYY-MM-DD, UNSEEN, FLAGGED
+
+icloud email send -t TO -s SUBJECT [-c CC] [-b BCC] [-B BODY] [-f FILE] [-a ACCOUNT]
+
+icloud email reply <uid> -m MAILBOX [-B BODY] [-f FILE] [--all] [-a ACCOUNT]
+
+icloud email move <uid> -m SOURCE -d DESTINATION [-a ACCOUNT]
+icloud email delete <uid> -m MAILBOX [-a ACCOUNT] [-f]
+icloud email mark <uid> -m MAILBOX --read|--unread [-a ACCOUNT]
+icloud email flag <uid> -m MAILBOX --set|--unset [-a ACCOUNT]
+
+# Draft management
+icloud email draft create -t TO -s SUBJECT [-c CC] [-B BODY] [-a ACCOUNT]
+icloud email draft list [-a ACCOUNT] [-n LIMIT] [-o FORMAT]
+icloud email draft update <uid> [-t TO] [-s SUBJECT] [-c CC] [-B BODY] [-a ACCOUNT]
+icloud email draft delete <uid> [-a ACCOUNT] [-f]
+icloud email draft send <uid> [-a ACCOUNT]
 ```
 
 ## Configuration
@@ -99,6 +141,13 @@ icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f]
 - XML requests use MKCALENDAR, PROPPATCH for calendar operations
 - Always escape XML content with `escapeXML()` helper
 
+### Email Operations
+- IMAP server: `imap.mail.me.com:993` (SSL/TLS)
+- SMTP server: `smtp.mail.me.com:587` (STARTTLS)
+- IMAP username: email prefix (e.g., `johnappleseed`)
+- SMTP username: full email address (e.g., `johnappleseed@icloud.com`)
+- Password: app-specific password (same as CalDAV)
+
 ### Naming
 - Use camelCase for Go identifiers
 - Command names use lowercase with hyphens (e.g., `set-default`)
@@ -108,4 +157,4 @@ icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f]
 
 - [x] Event management: list events
 - [x] Event management: create, update, delete events
-- [ ] Email support
+- [x] Email support: list, search, send, reply, drafts, move, delete, mark, flag

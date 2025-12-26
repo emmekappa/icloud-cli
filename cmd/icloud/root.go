@@ -18,4 +18,5 @@ func init() {
 	rootCmd.AddCommand(accountCmd)
 	rootCmd.AddCommand(calendarCmd)
 	rootCmd.AddCommand(eventCmd)
+	rootCmd.AddCommand(emailCmd)
 }

@@ -171,31 +171,31 @@ icloud email flag <message-id> -m MAILBOX --set|--unset [-a ACCOUNT]
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure (Week 1)
-- [ ] Add `go-imap/v2`, `go-smtp`, `go-sasl`, `go-message` dependencies
-- [ ] Create `internal/email/client.go` with IMAP/SMTP connection handling
-- [ ] Add email server configuration to existing account config
-- [ ] Implement `email mailbox list` command
+- [x] Add `go-imap/v2`, `go-smtp`, `go-sasl`, `go-message` dependencies
+- [x] Create `internal/email/client.go` with IMAP/SMTP connection handling
+- [x] Add email server configuration to existing account config
+- [x] Implement `email mailbox list` command
 
 ### Phase 2: Reading Emails (Week 1-2)
-- [ ] Implement `email list` command
-- [ ] Implement `email get` command with text/json/raw output
-- [ ] Implement `email search` command with IMAP search criteria
+- [x] Implement `email list` command
+- [x] Implement `email get` command with text/json/raw output
+- [x] Implement `email search` command with IMAP search criteria
 
 ### Phase 3: Sending Emails (Week 2)
-- [ ] Implement `email send` command
-- [ ] Implement `email reply` command with proper threading headers
-- [ ] Support HTML and plain text bodies
+- [x] Implement `email send` command
+- [x] Implement `email reply` command with proper threading headers
+- [x] Support HTML and plain text bodies
 - [ ] Handle attachments (stretch goal)
 
 ### Phase 4: Draft & Management (Week 3)
-- [ ] Implement draft CRUD operations
-- [ ] Implement `email move`, `email delete`
-- [ ] Implement `email mark`, `email flag`
+- [x] Implement draft CRUD operations
+- [x] Implement `email move`, `email delete`
+- [x] Implement `email mark`, `email flag`
 
 ### Phase 5: Polish (Week 3-4)
-- [ ] Add comprehensive error handling
+- [x] Add comprehensive error handling
 - [ ] Add tests with mock IMAP/SMTP servers
-- [ ] Documentation and examples
+- [x] Documentation and examples
 
 ## Data Structures
 
