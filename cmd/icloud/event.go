@@ -3,10 +3,12 @@ package icloud
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/jingkaihe/icloud-cli/internal/caldav"
@@ -56,6 +58,10 @@ Date formats supported:
 			events, err = client.ListEvents(ctx, cal.Path, start, end)
 			if err != nil {
 				return fmt.Errorf("failed to list events: %w", err)
+			}
+			for i := range events {
+				events[i].CalendarPath = cal.Path
+				events[i].CalendarName = cal.Name
 			}
 		} else {
 			events, err = client.ListEventsAllCalendars(ctx, start, end)
@@ -144,6 +150,7 @@ type eventOutput struct {
 	End         string `json:"end"`
 	Location    string `json:"location,omitempty"`
 	Description string `json:"description,omitempty"`
+	Calendar    string `json:"calendar,omitempty"`
 }
 
 func outputJSON(events []caldav.Event) error {
@@ -155,6 +162,7 @@ func outputJSON(events []caldav.Event) error {
 			End:         e.End.Format(time.RFC3339),
 			Location:    e.Location,
 			Description: e.Description,
+			Calendar:    e.CalendarName,
 		}
 	}
 
@@ -172,7 +180,8 @@ func outputTSV(events []caldav.Event) error {
 		return nil
 	}
 
-	fmt.Println("Title\tStart\tEnd\tLocation\tDescription")
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, "Calendar\tTitle\tStart\tEnd\tLocation\tDescription")
 	for _, e := range events {
 		location := e.Location
 		if location == "" {
@@ -185,7 +194,13 @@ func outputTSV(events []caldav.Event) error {
 		description = strings.ReplaceAll(description, "\n", " ")
 		description = strings.ReplaceAll(description, "\t", " ")
 
-		fmt.Printf("%s\t%s\t%s\t%s\t%s\n",
+		calendar := e.CalendarName
+		if calendar == "" {
+			calendar = "-"
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			calendar,
 			e.Summary,
 			e.Start.Format("2006-01-02 15:04"),
 			e.End.Format("2006-01-02 15:04"),
@@ -193,7 +208,7 @@ func outputTSV(events []caldav.Event) error {
 			description,
 		)
 	}
-	return nil
+	return w.Flush()
 }
 
 func init() {

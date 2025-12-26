@@ -240,6 +240,7 @@ type Event struct {
 	Start        time.Time
 	End          time.Time
 	CalendarPath string
+	CalendarName string
 }
 
 func (c *Client) ListEvents(ctx context.Context, calendarPath string, start, end time.Time) ([]Event, error) {
@@ -387,6 +388,10 @@ func (c *Client) ListEventsAllCalendars(ctx context.Context, start, end time.Tim
 		events, err := c.ListEvents(ctx, cal.Path, start, end)
 		if err != nil {
 			continue
+		}
+		for i := range events {
+			events[i].CalendarPath = cal.Path
+			events[i].CalendarName = cal.Name
 		}
 		allEvents = append(allEvents, events...)
 	}
