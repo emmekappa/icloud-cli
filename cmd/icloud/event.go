@@ -502,7 +502,6 @@ you will be prompted to choose.`,
 
 		eventUID := args[0]
 		calendarID, _ := cmd.Flags().GetString("calendar-id")
-		force, _ := cmd.Flags().GetBool("force")
 		series, _ := cmd.Flags().GetBool("series")
 		occurrenceStr, _ := cmd.Flags().GetString("occurrence")
 
@@ -531,12 +530,6 @@ you will be prompted to choose.`,
 				return fmt.Errorf("invalid occurrence time: %w", err)
 			}
 
-			if !force {
-				fmt.Printf("Are you sure you want to delete the occurrence of '%s' on %s? Use --force to confirm.\n",
-					existing.Summary, occurrenceTime.Format("2006-01-02 15:04"))
-				return nil
-			}
-
 			if err := client.DeleteEventOccurrence(ctx, cal.Path, eventUID, occurrenceTime); err != nil {
 				return fmt.Errorf("failed to delete occurrence: %w", err)
 			}
@@ -548,15 +541,6 @@ you will be prompted to choose.`,
 		if isRecurring && !series {
 			fmt.Printf("'%s' is a recurring event.\n", existing.Summary)
 			fmt.Println("Use --series to delete the entire series, or --occurrence <datetime> to delete a single occurrence.")
-			return nil
-		}
-
-		if !force {
-			if isRecurring {
-				fmt.Printf("Are you sure you want to delete the entire series '%s'? Use --force to confirm.\n", existing.Summary)
-			} else {
-				fmt.Printf("Are you sure you want to delete '%s'? Use --force to confirm.\n", existing.Summary)
-			}
 			return nil
 		}
 
@@ -620,7 +604,6 @@ func init() {
 	eventUpdateCmd.Flags().StringP("occurrence", "o", "", "Update single occurrence (format: YYYY-MM-DD HH:MM)")
 
 	eventDeleteCmd.Flags().StringP("calendar-id", "c", "", "Calendar ID or name (required)")
-	eventDeleteCmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
 	eventDeleteCmd.Flags().BoolP("series", "S", false, "Delete entire recurring series")
 	eventDeleteCmd.Flags().StringP("occurrence", "o", "", "Delete single occurrence (format: YYYY-MM-DD HH:MM)")
 

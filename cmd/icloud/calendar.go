@@ -116,9 +116,8 @@ Use 'icloud calendar list' to find the calendar ID.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := signalContext()
 		calendarID := args[0]
-		force, _ := cmd.Flags().GetBool("force")
 
-		client, account, err := getCalDAVClient(cmd)
+		client, _, err := getCalDAVClient(cmd)
 		if err != nil {
 			return err
 		}
@@ -127,14 +126,6 @@ Use 'icloud calendar list' to find the calendar ID.`,
 		if err != nil {
 			return fmt.Errorf("failed to find calendar: %w", err)
 		}
-
-		if !force {
-			fmt.Printf("Are you sure you want to delete calendar '%s' from %s?\n", cal.Name, account.Email)
-			fmt.Printf("This action cannot be undone. Use --force to skip this prompt.\n")
-			return fmt.Errorf("operation cancelled (use --force to confirm)")
-		}
-
-		fmt.Printf("Deleting calendar '%s'...\n", cal.Name)
 
 		if err := client.DeleteCalendar(ctx, cal.Path); err != nil {
 			return fmt.Errorf("failed to delete calendar: %w", err)
@@ -187,7 +178,6 @@ Use 'icloud calendar list' to find the calendar ID.`,
 func init() {
 	calendarCmd.PersistentFlags().StringP("account", "a", "", "Account to use (email or alias)")
 
-	calendarDeleteCmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
 	calendarUpdateCmd.Flags().StringP("name", "n", "", "New calendar name")
 
 	calendarCmd.AddCommand(calendarListCmd)

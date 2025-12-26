@@ -55,7 +55,7 @@ go build -o icloud .
 go test ./...
 
 # Acceptance tests (requires logged-in iCloud account)
-./test/acceptance/calendar_event_test.sh
+go test -v -tags=acceptance ./test/acceptance/...
 
 # Tidy dependencies
 go mod tidy
@@ -74,7 +74,7 @@ icloud account remove <account>
 # Calendar management
 icloud calendar list [-a ACCOUNT]
 icloud calendar create <name> [-a ACCOUNT]
-icloud calendar delete <calendar-id> [-a ACCOUNT] [-f]
+icloud calendar delete <calendar-id> [-a ACCOUNT]
 icloud calendar update <calendar-id> -n <new-name> [-a ACCOUNT]
 
 # Event management
@@ -97,7 +97,7 @@ icloud event update <event-uid> -c CALENDAR_ID [-t TITLE] [-s START] [-e END] [-
   # For recurring events:
   #   --series (-S): Update entire recurring series
   #   --occurrence (-o): Update single occurrence (format: YYYY-MM-DD HH:MM)
-icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-f] [-S] [-o OCCURRENCE]
+icloud event delete <event-uid> -c CALENDAR_ID [-a ACCOUNT] [-S] [-o OCCURRENCE]
   # For recurring events:
   #   --series (-S): Delete entire recurring series
   #   --occurrence (-o): Delete single occurrence (format: YYYY-MM-DD HH:MM)
