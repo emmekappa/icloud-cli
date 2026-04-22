@@ -23,11 +23,11 @@ BUILD_TIME = "{{exec(command='date -u \"+%a %b %d %I:%M:%S %p UTC %Y\"')}}"
 VERSION_PKG = "github.com/jingkaihe/icloud-cli/version"
 
 [tasks.build]
-description = "Build the CLI application"
+description = "Build the CLI application (native; CGO on by default so Reminders work on macOS)"
 run = [
   "mkdir -p bin",
   "echo 'Building icloud CLI binary...'",
-  "CGO_ENABLED=0 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud ./",
+  "go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud ./",
 ]
 
 [tasks.test]

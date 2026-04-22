@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A Go-based CLI tool for interacting with iCloud services. Supports calendar management via CalDAV and email management via IMAP/SMTP.
+A Go-based CLI tool for interacting with iCloud services. Supports calendar management via CalDAV, email management via IMAP/SMTP, and Reminders (macOS only) via Apple's EventKit framework (CGO bridge).
 
 ## Tech Stack
 
@@ -26,7 +26,11 @@ A Go-based CLI tool for interacting with iCloud services. Supports calendar mana
 │   ├── email_list.go            # Email list, get, search commands
 │   ├── email_send.go            # Email send and reply commands
 │   ├── email_draft.go           # Draft management commands
-│   └── email_manage.go          # Email move, delete, mark, flag commands
+│   ├── email_manage.go          # Email move, delete, mark, flag commands
+│   ├── reminder.go              # Reminder command group (macOS only)
+│   ├── reminder_list.go         # reminder list / lists / get + shared render helpers
+│   ├── reminder_search.go       # reminder search (client-side text + structured filters)
+│   └── reminder_manage.go       # reminder create / update / complete / uncomplete
 ├── internal/
 │   ├── caldav/                  # CalDAV client wrapper for iCloud
 │   │   ├── client.go            # Client struct, NewClient(), FindCalendarHomeSet()
@@ -39,6 +43,12 @@ A Go-based CLI tool for interacting with iCloud services. Supports calendar mana
 │   │   ├── imap.go              # IMAP operations (list, fetch, search, move, delete, mark, flag)
 │   │   ├── smtp.go              # SMTP operations (send)
 │   │   └── draft.go             # Draft-specific operations
+│   ├── reminders/               # Reminders via Apple EventKit (darwin+cgo only)
+│   │   ├── reminder.go          # Go types (List, Reminder, Alarm) + Backend interface
+│   │   ├── ekbridge_darwin.h    # ObjC header (function prototypes)
+│   │   ├── ekbridge_darwin.m    # ObjC: EKEventStore + EKReminder access, returns JSON
+│   │   ├── ekbridge_darwin.go   # CGO glue (//go:build darwin && cgo)
+│   │   └── ekbridge_unsupported.go # Stub for !darwin || !cgo — returns clear error
 │   └── config/config.go         # Config management (~/.config/icloud-cli/)
 ```
 
@@ -165,6 +175,17 @@ icloud email draft send <uid> [-a ACCOUNT]
 - IMAP username: email prefix (e.g., `johnappleseed`)
 - SMTP username: full email address (e.g., `johnappleseed@icloud.com`)
 - Password: app-specific password (same as CalDAV)
+
+### Reminders (macOS only)
+- Uses Apple's `EventKit` framework via a small Objective-C bridge compiled by CGO. Entry points: `EKRequestAccess`, `EKListLists`, `EKListReminders`, `EKGetReminder`, `EKCreateReminder`, `EKUpdateReminder`, `EKSetCompleted` — each returns a JSON C string that Go unmarshals.
+- Write path (`Create`/`Update`): Go marshals a `CreateInput` / `UpdateInput` (pointer-field struct for presence semantics) to JSON and hands it to the bridge. The bridge applies only the fields that are present, then calls `saveReminder:commit:YES`. For `Update`, absent keys mean "leave unchanged"; explicit empty strings for notes/url clear them; `clear_due:true` removes the due date and its alarm.
+- Timed due dates install a single absolute `EKAlarm` at the due moment (matches Reminders.app default behavior). All-day due dates install no alarm.
+- **Not CalDAV**: Apple froze the CalDAV VTODO lists in iOS 13; real Reminders live in a private CloudKit container. CalDAV now only returns two migration-placeholder VTODOs per legacy list.
+- No credentials are held in this process — EventKit talks to `remindd`, which is already authenticated at the system level.
+- First call triggers a TCC prompt for Reminders access. Denial surfaces a clear error.
+- Build tags: the real implementation requires `darwin && cgo`; otherwise a stub is compiled that returns `errUnsupported`.
+- `CGO_ENABLED=0` (used by the current cross-build) disables Reminders even on darwin binaries. Native `go build` / `mise run build` on macOS enable CGO by default.
+- Priority mapping uses RFC 5545 integers: 0 none, 1 high, 5 medium, 9 low.
 
 ### Naming
 - Use camelCase for Go identifiers
