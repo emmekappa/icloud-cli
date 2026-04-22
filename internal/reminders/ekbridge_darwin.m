@@ -58,9 +58,26 @@ static NSDateFormatter* dateOnlyFormatter(void) {
 }
 
 // Requests Reminders access synchronously. Returns a retained store on success
-// or nil on denial (setting *errOut).
+// or nil on denial (setting *errOut). Fast-paths the already-authorized case
+// so repeated invocations never block on a semaphore.
 static EKEventStore* requestAccessSync(char** errOut) {
     EKEventStore* store = [[EKEventStore alloc] init];
+
+    EKAuthorizationStatus status = [EKEventStore authorizationStatusForEntityType:EKEntityTypeReminder];
+    switch (status) {
+        case EKAuthorizationStatusAuthorized:
+            return store;
+        case EKAuthorizationStatusRestricted:
+            if (errOut) *errOut = dupStr(@"Reminders access is restricted by this device (MDM / parental controls). Cannot proceed.");
+            return nil;
+        case EKAuthorizationStatusDenied:
+            if (errOut) *errOut = dupStr(@"Reminders access was previously denied. Open System Settings > Privacy & Security > Reminders and enable access for your terminal application.");
+            return nil;
+        case EKAuthorizationStatusNotDetermined:
+        default:
+            break;
+    }
+
     dispatch_semaphore_t sema = dispatch_semaphore_create(0);
     __block BOOL granted = NO;
     __block NSError* authErr = nil;
@@ -86,6 +103,13 @@ static EKEventStore* requestAccessSync(char** errOut) {
         return nil;
     }
     return store;
+}
+
+// waitWithTimeout blocks on the semaphore up to `seconds`. Returns YES on
+// signal, NO on timeout.
+static BOOL waitWithTimeout(dispatch_semaphore_t sema, int64_t seconds) {
+    dispatch_time_t deadline = dispatch_time(DISPATCH_TIME_NOW, seconds * NSEC_PER_SEC);
+    return dispatch_semaphore_wait(sema, deadline) == 0;
 }
 
 static NSDictionary* reminderToDict(EKReminder* r) {
@@ -201,7 +225,10 @@ char* EKListReminders(const char* listID, int includeCompleted, char** errOut) {
             result = arr;
             dispatch_semaphore_signal(sema);
         }];
-        dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+        if (!waitWithTimeout(sema, 60)) {
+            if (errOut) *errOut = dupStr(@"timed out waiting for Reminders data — is the remindd daemon responsive?");
+            return NULL;
+        }
 
         NSMutableArray* out = [NSMutableArray array];
         for (EKReminder* r in (result ?: @[])) {
