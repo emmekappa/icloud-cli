@@ -262,26 +262,17 @@ static NSDateComponents* parseDueComponents(NSDictionary* input, BOOL* hasTime) 
     return dc;
 }
 
-// Applies a "due" field change to a reminder. When hasTime is YES, also
-// installs a single absolute alarm at that moment (mirroring what the
-// Reminders app does when you set "remind me on a day at a time").
+// Applies a "due" field change to a reminder. When hasTime is YES, a single
+// absolute alarm is installed at that moment (matching Reminders.app default
+// for timed reminders). In the date-only case alarms are left untouched so we
+// don't silently wipe any pre-existing user alarms on update.
 static void applyDueToReminder(EKReminder* r, NSDateComponents* dc, BOOL hasTime) {
     r.dueDateComponents = dc;
+    if (!dc || !hasTime) return;
 
-    // Remove any previous "absolute at due" alarms we may have added before.
-    // Heuristic: drop alarms whose absoluteDate equals the previous due.
-    // Simpler: if caller passed a due with time, reset the alarm set to a
-    // single absolute one; if caller passed a date-only, clear the alarms.
-    NSMutableArray* alarms = [NSMutableArray array];
-    if (dc && hasTime) {
-        NSCalendar* cal = [NSCalendar currentCalendar];
-        NSDate* d = [cal dateFromComponents:dc];
-        if (d) {
-            EKAlarm* a = [EKAlarm alarmWithAbsoluteDate:d];
-            [alarms addObject:a];
-        }
-    }
-    r.alarms = alarms;
+    NSDate* d = [[NSCalendar currentCalendar] dateFromComponents:dc];
+    if (!d) return;
+    r.alarms = @[[EKAlarm alarmWithAbsoluteDate:d]];
 }
 
 char* EKCreateReminder(const char* jsonInput, char** errOut) {

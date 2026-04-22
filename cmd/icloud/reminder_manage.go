@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	"github.com/jingkaihe/icloud-cli/internal/reminders"
@@ -60,7 +59,7 @@ var reminderCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printReminderResult(cmd, r, "Created")
+		return printReminderResult(cmd, r)
 	},
 }
 
@@ -124,7 +123,7 @@ To clear notes or url, pass them as an empty string (-n "" or -u "").`,
 		if err != nil {
 			return err
 		}
-		return printReminderResult(cmd, r, "Updated")
+		return printReminderResult(cmd, r)
 	},
 }
 
@@ -138,7 +137,7 @@ var reminderCompleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printReminderResult(cmd, r, "Completed")
+		return printReminderResult(cmd, r)
 	},
 }
 
@@ -152,7 +151,7 @@ var reminderUncompleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printReminderResult(cmd, r, "Reopened")
+		return printReminderResult(cmd, r)
 	},
 }
 
@@ -202,21 +201,14 @@ func parseDue(s string) (*reminders.DueInput, error) {
 	return nil, fmt.Errorf("invalid due format %q (use YYYY-MM-DD or YYYY-MM-DD HH:MM)", s)
 }
 
-func printReminderResult(cmd *cobra.Command, r *reminders.Reminder, verb string) error {
+func printReminderResult(cmd *cobra.Command, r *reminders.Reminder) error {
 	format, _ := cmd.Flags().GetString("output")
 	if format == "json" {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(r)
 	}
-	due := r.Due
-	if due == "" {
-		due = "-"
-	}
-	fmt.Fprintf(os.Stderr, "%s %s\n", verb, r.UID)
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.UID, r.List, due, r.Title)
-	return w.Flush()
+	return renderReminders([]reminders.Reminder{*r}, format)
 }
 
 func init() {
@@ -226,7 +218,6 @@ func init() {
 	reminderCreateCmd.Flags().StringP("priority", "p", "", "Priority: none | high | medium | low (or 0-9)")
 	reminderCreateCmd.Flags().StringP("notes", "n", "", "Notes / description")
 	reminderCreateCmd.Flags().StringP("url", "u", "", "Associated URL")
-	reminderCreateCmd.Flags().StringP("output", "o", "tsv", "Output format: tsv or json")
 
 	reminderUpdateCmd.Flags().StringP("title", "t", "", "New title")
 	reminderUpdateCmd.Flags().StringP("list", "L", "", "Move reminder to this list ID")
@@ -235,10 +226,6 @@ func init() {
 	reminderUpdateCmd.Flags().StringP("notes", "n", "", "New notes (empty string clears)")
 	reminderUpdateCmd.Flags().StringP("url", "u", "", "New URL (empty string clears)")
 	reminderUpdateCmd.Flags().Bool("clear-due", false, "Remove the due date")
-	reminderUpdateCmd.Flags().StringP("output", "o", "tsv", "Output format: tsv or json")
-
-	reminderCompleteCmd.Flags().StringP("output", "o", "tsv", "Output format: tsv or json")
-	reminderUncompleteCmd.Flags().StringP("output", "o", "tsv", "Output format: tsv or json")
 
 	reminderCmd.AddCommand(reminderCreateCmd)
 	reminderCmd.AddCommand(reminderUpdateCmd)

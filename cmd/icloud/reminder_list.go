@@ -186,12 +186,7 @@ func formatOffset(seconds float64) string {
 func init() {
 	reminderListCmd.Flags().StringP("list", "L", "", "Reminder list ID to filter by")
 	reminderListCmd.Flags().Bool("include-completed", false, "Include completed reminders")
-	reminderListCmd.Flags().StringP("output", "o", "tsv", "Output format: tsv or json")
 	reminderListCmd.Flags().IntP("limit", "n", 0, "Max number of reminders (0 = no limit)")
-
-	reminderGetCmd.Flags().StringP("output", "o", "text", "Output format: text or json")
-
-	reminderListsCmd.Flags().StringP("output", "o", "tsv", "Output format: tsv or json")
 
 	reminderCmd.AddCommand(reminderListCmd)
 	reminderCmd.AddCommand(reminderGetCmd)

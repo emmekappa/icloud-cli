@@ -136,7 +136,6 @@ func init() {
 	reminderSearchCmd.Flags().String("due-after", "", "Only reminders due after YYYY-MM-DD")
 	reminderSearchCmd.Flags().Bool("no-due", false, "Only reminders without a due date")
 	reminderSearchCmd.Flags().IntP("limit", "n", 0, "Max number of results (0 = no limit)")
-	reminderSearchCmd.Flags().StringP("output", "o", "tsv", "Output format: tsv or json")
 
 	reminderCmd.AddCommand(reminderSearchCmd)
 }

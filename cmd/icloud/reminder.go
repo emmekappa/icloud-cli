@@ -19,3 +19,7 @@ container.
 On first run, macOS will prompt for authorization. You can also open
 System Settings > Privacy & Security > Reminders to manage access.`,
 }
+
+func init() {
+	reminderCmd.PersistentFlags().StringP("output", "o", "tsv", "Output format: tsv or json (get: text or json)")
+}
