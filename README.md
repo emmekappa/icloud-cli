@@ -224,7 +224,7 @@ icloud email draft send <uid> [-a ACCOUNT]
 
 > **Platform:** macOS only. The `reminder` commands are stubbed out on Linux and Windows and will return an "unsupported platform" error.
 >
-> **Build requirement:** CGO must be enabled. `mise run build` and `go build` (both run natively on macOS) enable it by default. The pre-built release binaries are cross-compiled with `CGO_ENABLED=0`, so to use the Reminders commands you currently need to build locally on a Mac.
+> **Build requirement:** CGO must be enabled. `mise run build` and `go build` (both run natively on macOS) enable it by default. The release pipeline builds darwin binaries on a `macos-latest` runner with CGO on, so the published `icloud-darwin-{amd64,arm64}` binaries include full Reminders support; `icloud-linux-*` and `icloud-windows-amd64` are built with CGO off (they use the stub).
 
 #### Why Reminders are different
 
