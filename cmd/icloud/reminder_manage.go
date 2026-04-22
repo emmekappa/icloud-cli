@@ -68,7 +68,7 @@ var reminderUpdateCmd = &cobra.Command{
 	Short: "Update an existing reminder",
 	Long: `Update a reminder by UID. Only the flags you provide are changed.
 
-To clear the due date use --clear-due (ignored if --due is also given).
+Use --clear-due to remove the due date (mutually exclusive with --due).
 To clear notes or url, pass them as an empty string (-n "" or -u "").`,
 	Example: `  icloud reminder update 2AC43... -t "Buy 2% milk"
   icloud reminder update 2AC43... -d "2026-05-01 20:00"
@@ -226,6 +226,7 @@ func init() {
 	reminderUpdateCmd.Flags().StringP("notes", "n", "", "New notes (empty string clears)")
 	reminderUpdateCmd.Flags().StringP("url", "u", "", "New URL (empty string clears)")
 	reminderUpdateCmd.Flags().Bool("clear-due", false, "Remove the due date")
+	reminderUpdateCmd.MarkFlagsMutuallyExclusive("due", "clear-due")
 
 	reminderCmd.AddCommand(reminderCreateCmd)
 	reminderCmd.AddCommand(reminderUpdateCmd)
