@@ -23,11 +23,11 @@ BUILD_TIME = "{{exec(command='date -u \"+%a %b %d %I:%M:%S %p UTC %Y\"')}}"
 VERSION_PKG = "github.com/jingkaihe/icloud-cli/version"
 
 [tasks.build]
-description = "Build the CLI application"
+description = "Build the CLI application (native; CGO on by default so Reminders work on macOS)"
 run = [
   "mkdir -p bin",
   "echo 'Building icloud CLI binary...'",
-  "CGO_ENABLED=0 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud ./",
+  "go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud ./",
 ]
 
 [tasks.test]
@@ -42,17 +42,26 @@ run = ["gofumpt -w ."]
 description = "Run all linters (go vet, golangci-lint, staticcheck)"
 run = ["go vet ./...", "echo 'Running golangci-lint...'", "golangci-lint run", "echo 'Running staticcheck...'", "staticcheck -checks=all ./..."]
 
-[tasks.cross-build]
-description = "Cross-compile for multiple platforms"
+[tasks.build-release-nondarwin]
+description = "Build release binaries for linux + windows (CGO off; any runner)"
 run = [
   "mkdir -p bin",
-  "echo 'Cross-compiling for multiple platforms...'",
   "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud-linux-amd64 ./",
   "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud-linux-arm64 ./",
-  "CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud-darwin-amd64 ./",
-  "CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud-darwin-arm64 ./",
   "CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud-windows-amd64.exe ./",
 ]
+
+[tasks.build-release-darwin]
+description = "Build darwin release binaries (CGO on; macOS runner required for EventKit linking)"
+run = [
+  "mkdir -p bin",
+  "CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud-darwin-amd64 ./",
+  "CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags=\"-X '$VERSION_PKG.Version=$VERSION' -X '$VERSION_PKG.GitCommit=$GIT_COMMIT' -X '$VERSION_PKG.BuildTime=$BUILD_TIME'\" -o ./bin/icloud-darwin-arm64 ./",
+]
+
+[tasks.cross-build]
+description = "Build all release binaries locally (requires a mac: darwin needs CGO)"
+depends = ["build-release-nondarwin", "build-release-darwin"]
 
 [tasks.install]
 description = "Install Go module dependencies"
@@ -63,16 +72,17 @@ run = [
   "echo 'All dependencies installed successfully!'",
 ]
 
+[tasks.release-upload]
+description = "Create GitHub release from binaries already sitting in ./bin (used by CI)"
+run = [
+  "gh release create v$VERSION ./bin/icloud-linux-amd64 ./bin/icloud-linux-arm64 ./bin/icloud-darwin-amd64 ./bin/icloud-darwin-arm64 ./bin/icloud-windows-amd64.exe",
+]
+
 [tasks.release]
-description = "Create GitHub release with cross-compiled binaries"
+description = "Build everything then publish to GitHub (local one-shot; requires macOS + gh auth)"
 depends = ["cross-build"]
 run = [
-  "gh release create v$VERSION",
-  "gh release upload v$VERSION ./bin/icloud-linux-amd64",
-  "gh release upload v$VERSION ./bin/icloud-linux-arm64",
-  "gh release upload v$VERSION ./bin/icloud-darwin-amd64",
-  "gh release upload v$VERSION ./bin/icloud-darwin-arm64",
-  "gh release upload v$VERSION ./bin/icloud-windows-amd64.exe",
+  "gh release create v$VERSION ./bin/icloud-linux-amd64 ./bin/icloud-linux-arm64 ./bin/icloud-darwin-amd64 ./bin/icloud-darwin-arm64 ./bin/icloud-windows-amd64.exe",
 ]
 
 [tasks.push-tag]
